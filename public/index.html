@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <title>CRUD Consumindo API</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <h1>Torque Moto Parts</h1>
+        
+        <div class="search-bar">
+            <input type="text" id="barraPesquisa" placeholder="Pesquisa por nome..." oninput="filtrarProdutos()">
+        </div>
+
+        <div class="form-container">
+            <input type="text" id="nome" class="form-input" placeholder="Nome do Produto">
+            <input type="number" id="preco" class="form-input" placeholder="Preço" min="1"> 
+            <input type="number" id="estoque" class="form-input" placeholder="Estoque" min="1"> 
+            
+            <div class="button-group">
+                <button onclick="salvarProduto()" id="btnSalvar" class="btn btn-primary">Adicionar Produto</button>
+                <button onclick="cancelarEdicao()" id="btnCancelar" class="btn btn-secondary" style="display: none;">Cancelar</button>
+            </div>
+        </div>
+
+        <table id="tabelaProdutos" class="product-table">
+            <thead>
+                <tr>
+                    <th>Nome do Produto</th>
+                    <th>Preço</th>
+                    <th>Estoque</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody id="listaProdutos"></tbody>
+        </table>
+    </div>
+
+    <script>
+        let produtoEditando = null;
+
+        document.addEventListener('DOMContentLoaded', loadProdutos);
+
+        async function loadProdutos() {
+            const response = await fetch('http://localhost:3001/produtos');
+            const produtos = await response.json();
+            const lista = document.getElementById('listaProdutos');
+            lista.innerHTML = produtos.map(produto => `
+                <tr>
+                    <td>${produto.nome}</td>
+                    <td>R$${produto.preco}</td>
+                    <td>${produto.estoque}</td>
+                    <td>
+                        <button onclick="editarProduto('${produto._id}')" class="btn btn-secondary">Editar</button>
+                        <button onclick="deletarProduto('${produto._id}')" class="btn btn-secondary">Deletar</button>
+                    </td>
+                </tr>
+            `).join('');
+            if (window.innerWidth <= 768) {
+                document.querySelectorAll('#listaProdutos tr').forEach(row => {
+                    row.cells[0].setAttribute('data-label', 'Nome:');
+                    row.cells[1].setAttribute('data-label', 'Preço:');
+                    row.cells[2].setAttribute('data-label', 'Estoque:');
+                    row.cells[3].setAttribute('data-label', 'Ações:');
+                });
+            }
+        }
+
+        async function salvarProduto() {
+            const nomeInput = document.getElementById('nome');
+            const precoInput = document.getElementById('preco');
+            const estoqueInput = document.getElementById('estoque');
+
+            const nome = nomeInput.value.trim();
+            const preco = parseFloat(precoInput.value);
+            const estoque = parseInt(estoqueInput.value);
+
+       
+            if (!nome || nome === '') {
+                alert('Insira um nome para o produto.');
+                return;
+            }
+            if (isNaN(preco) || preco <= 0) { 
+                alert('O preço do produto deve ser um valor numérico válido.');
+                return;
+            }
+            if (isNaN(estoque) || estoque <= 0) { 
+                alert('O estoque do produto deve ser um valor numérico válido.');
+                return;
+            }
+            
+
+            const produto = { nome, preco, estoque };
+
+            const url = produtoEditando
+                ? `http://localhost:3001/produtos/${produtoEditando}`
+                : 'http://localhost:3001/produtos';
+            const method = produtoEditando ? 'PUT' : 'POST';
+
+            const response = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(produto)
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                alert(`Erro do servidor: ${errorData.erro}`);
+                return;
+            }
+
+            limparFormulario();
+            loadProdutos();
+        }
+
+        async function editarProduto(id) {
+            const response = await fetch(`http://localhost:3001/produtos/${id}`);
+            const produto = await response.json();
+            
+            document.getElementById('nome').value = produto.nome;
+            document.getElementById('preco').value = produto.preco;
+            document.getElementById('estoque').value = produto.estoque;
+            
+            produtoEditando = id;
+            document.getElementById('btnSalvar').textContent = 'Atualizar Produto';
+            document.getElementById('btnCancelar').style.display = 'inline-block';
+        }
+
+        async function deletarProduto(id) {
+            if (confirm('Tem certeza que quer deletar esse produto ?')) {
+                await fetch(`http://localhost:3001/produtos/${id}`, { method: 'DELETE' });
+                loadProdutos();
+            }
+        }
+
+        function cancelarEdicao() {
+            limparFormulario();
+            produtoEditando = null;
+            document.getElementById('btnSalvar').textContent = 'Adicionar Produto';
+            document.getElementById('btnCancelar').style.display = 'none';
+        }
+
+        function limparFormulario() {
+            document.getElementById('nome').value = '';
+            document.getElementById('preco').value = '';
+            document.getElementById('estoque').value = '';
+        }
+
+        function filtrarProdutos() {
+            const termo = document.getElementById('barraPesquisa').value.toLowerCase();
+            const linhas = document.querySelectorAll('#listaProdutos tr');
+
+            linhas.forEach(linha => {
+                const nome = linha.cells[0].textContent.toLowerCase();
+                if (nome.includes(termo)) {
+                    linha.style.display = '';
+                } else {
+                    linha.style.display = 'none';
+                }
+            });
+        }
+    </script>
+</body>
+</html>
